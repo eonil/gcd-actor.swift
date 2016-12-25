@@ -78,6 +78,15 @@ I recommend creating less than 64 actors. It would be enough to
 provide application flow control for each domains. Just accept this
 limit like you avoid stack overflow. 
 
+Note
+----
+*macOS 10.12.2* has hard limit in maximum number of threads.
+GCD: 512
+`Foundation.Thread`: 2048
+`pthread`: 2048
+
+I haven't tested kernel API, but it should have similar limit.
+
 Swift 4
 -------
 Chris Lattener explcitly declared an implmentation of Actor model
