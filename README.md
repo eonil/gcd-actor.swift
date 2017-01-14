@@ -3,6 +3,8 @@ EonilGCDActor
 2016/12/15
 Hoon H.
 
+[![Build Status](https://travis-ci.org/eonil/gcd-actor.swift.svg?branch=master)](https://travis-ci.org/eonil/gcd-actor.swift)
+
 Provides a limited actor model on top of GCD.
 
 Why?
