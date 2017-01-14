@@ -51,38 +51,81 @@ fileprivate final class GCDActorImpl: GCDActorSelf, GCDActorRef {
     }
 }
 
+/// Mimics Go-lang's channel.
+///
+/// - Note:
+///     `GCDChannel` object is supposed to have no buffered
+///     value when it gets `deinit`ialized.
+///     Make sure your program won't put any extra values
+///     in channel.
+///
+///     - Ref 1: https://tour.golang.org/concurrency/2
+///     - Ref 2: https://tour.golang.org/concurrency/3
+///
+///     `Closing channel` concept is not implemented.
+///
 public final class GCDChannel<T> {
+    private let valueAvailabilitySemaphore = DispatchSemaphore(value: 0)
+    private let capacityAvailabilitySemaphore: DispatchSemaphore
+    private let lck = NSLock()
     /// Critical section. Always lock when you access this.
     private var buf = [T]()
-    private let smp = DispatchSemaphore(value: 0)
-    private let lck = NSLock()
-    public init() {
+
+    /// - Parameter capacity:
+    ///     Set to 0 to make unbuffered channel which waits other side on both of
+    ///     send and receive.
+    ///     Set to non-zero value to make buffer channel which waits only if the
+    ///     buffer is full.
+    ///
+    public init(capacity: Int = 0) {
+        precondition(capacity >= 0, "Capacity must be >=0.")
+        precondition(capacity <= 1024, "Capacity must be <=1024. This limit is set without a good reason. Remove this limit if you feed need for it.")
+        // Pre-signal `capacityAvailabilitySemaphore`.
+        capacityAvailabilitySemaphore = DispatchSemaphore(value: capacity)
     }
-    public convenience init(_ initialValues: [T]) {
-        self.init()
-        buf = initialValues
-    }
+    //    public convenience init(_ initialValues: [T]) {
+    //        self.init()
+    //        buf = initialValues
+    //    }
     deinit {
         debugUnmarkThread(of: self)
+        assert(buf.isEmpty, "There's some remaining data in this channel. Your program is likely to have some bug.")
+    }
+    /// Gets availability of any signal.
+    /// This also perform locking of internal memory.
+    ///
+    /// - Note:
+    ///     I am not sure that this feature is really
+    ///     required to be exposed or not.
+    ///
+    private var isAvailable: Bool {
+        let returningValue: Bool
+        lck.lock()
+        returningValue = (buf.count > 0)
+        lck.unlock()
+        return returningValue
     }
     /// Blocks caller until a new value to be pushed if no value is now in channel.
     /// Beware deadlock.
     public func receive() -> T {
         debugAssertReceiving(of: self)
-        smp.wait()
-        let tmp1: T
+        // Pre-signal capacity availability.
+        capacityAvailabilitySemaphore.signal()
+        valueAvailabilitySemaphore.wait()
+        let returningValue: T
         lck.lock()
         assert(buf.isEmpty == false)
-        tmp1 = buf.removeFirst()
+        returningValue = buf.removeFirst()
         lck.unlock()
-        return tmp1
+        return returningValue
     }
     public func send(_ newValue: T) {
         debugMarkThread(of: self)
+        capacityAvailabilitySemaphore.wait()
         lck.lock()
         buf.append(newValue)
         lck.unlock()
-        smp.signal()
+        valueAvailabilitySemaphore.signal()
     }
 }
 
