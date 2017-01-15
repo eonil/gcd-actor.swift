@@ -1,4 +1,4 @@
-**ABANDONED: Replaced by https://travis-ci.org/eonil/pco.swift. Do not use this library anymore.**
+**ABANDONED: Replaced by https://github.com/eonil/pco.swift. Do not use this library anymore.**
 
 EonilGCDActor
 =============
